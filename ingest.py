@@ -6,6 +6,7 @@ from langchain_openai import AzureOpenAIEmbeddings
 from langchain_chroma import Chroma
 import fitz
 from langchain_classic.schema import Document
+import time
 
 load_dotenv()
 
@@ -51,12 +52,23 @@ def build_index(chunks):
         azure_deployment=os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT"),
         api_version=os.getenv("AZURE_OPENAI_EMBEDDING_API_VERSION")
     )
-    print("\nBuilding vector index... This may take a while...")
-    db= Chroma.from_documents(
-        documents=chunks,
-         embedding=embeddings,
-         persist_directory="chroma_db"
-    )
+
+    batch_size = 50
+    print("\nBuilding index {len(chunks)} chunk in batches of {batch_size}...")
+    db = None
+    for i in range(0, len(chunks), batch_size):
+        batch = chunks[i:i+batch_size]
+        print(f"  Processing batch {i//batch_size + 1} ({len(batch)} chunkkia)...")
+        if db is None:
+            db = Chroma.from_documents(
+                documents=batch,
+                embedding=embeddings,
+                persist_directory="chroma_db"
+            )
+        else:
+            db.add_documents(batch)
+        time.sleep(3)  # Vältä nopeaa peräkkäistä API-kutsua
+
     print("Index built successfully. Pesisted to chroma_db directory.")
     return db
     

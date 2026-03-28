@@ -17,7 +17,6 @@ def load_qa_chain():
         api_version=os.getenv("AZURE_OPENAI_EMBEDDING_API_VERSION")
     )
     db = Chroma(
-        collection_name="energybot_docs",
         embedding_function=embeddings,
         persist_directory="chroma_db"
     )
@@ -56,8 +55,8 @@ st.title("EnergyBot - Kysy energia-alan dokumenteista")
 st.caption("Kysy suomalaisista energia-alan dokumenteista. EnergyBot hakee vastaukset dokumenteista, eikä keksi tietoa itse.")
 
 st.info("**Esimerkkikysymyksiä:**\n"
-        "- Mikä iku Suomen kaukoälämmön kokonaistuotanto vuonna 2024?\n"
-        "- Miten Fingridin palkintäjärjestelmä toimii?\n" \
+        "- Mikä oli Suomen kaukoälämmön kokonaistuotanto vuonna 2024?\n"
+        "- Miten Fingridin palkintajärjestelmä toimii?\n" \
         "- Mikä on sähkönkulutuksen trendi Suomessa?")
 
 question = st.text_input("Kirjoita kysymyksesi tähän:")
