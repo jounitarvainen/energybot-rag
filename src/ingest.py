@@ -1,12 +1,13 @@
 import os
+import fitz
+import time
 from dotenv import load_dotenv
 from azure.storage.blob import BlobServiceClient
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import AzureOpenAIEmbeddings
 from langchain_chroma import Chroma
-import fitz
 from langchain_classic.schema import Document
-import time
+from rag.embeddings import get_embeddings
 
 load_dotenv()
 
@@ -46,12 +47,7 @@ def load_and_split(local_dir):
     return chunks
 
 def build_index(chunks):
-    embeddings = AzureOpenAIEmbeddings(
-        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"), 
-        api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-        azure_deployment=os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT"),
-        api_version=os.getenv("AZURE_OPENAI_EMBEDDING_API_VERSION")
-    )
+    embeddings = get_embeddings()
 
     batch_size = 50
     print("\nBuilding index {len(chunks)} chunk in batches of {batch_size}...")
