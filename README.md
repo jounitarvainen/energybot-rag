@@ -137,3 +137,5 @@ Sovellus käyttää seuraavia julkisia suomalaisia energiadokumentteja:
 - [ ] Azure AI Search — hybrid search (semantic + keyword)
 - [ ] Azure Container Apps — pilviympäristöön deployment
 - [ ] Dokumenttien automaattinen päivitys Blob Storage triggerillä
+- [ ] VNet-integraatio Container Appsiin — staattinen uloslähtevä IP, 
+      mahdollistaa IP-whitelistauksen Azure OpenAI:lle ja Storage Accountille
