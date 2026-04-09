@@ -3,9 +3,8 @@ import fitz
 import time
 from dotenv import load_dotenv
 from azure.storage.blob import BlobServiceClient
+from langchain_community.vectorstores.azuresearch import AzureSearch
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_openai import AzureOpenAIEmbeddings
-from langchain_chroma import Chroma
 from langchain_classic.schema import Document
 from rag.embeddings import get_embeddings
 
@@ -17,9 +16,11 @@ def download_blobs(local_dir="temp_docs"):
     container_client = client.get_container_client(os.getenv("AZURE_STORAGE_CONTAINER_NAME"))
     blobs = list(container_client.list_blobs())
     for blob in blobs:
-        path = os.path.join(local_dir, blob.name)
+        if not blob.name.endswith(".pdf"):
+            continue
+        path = os.path.join(local_dir, os.path.basename(blob.name))
         with open(path, "wb") as f:
-            f.write(container_client.download_blob(blob).readall())    
+            f.write(container_client.download_blob(blob).readall())
         print(f"  Downloaded {blob.name} to {path}")
     return local_dir
 
@@ -38,36 +39,34 @@ def load_and_split(local_dir):
                     ))
             print(f"  Purettu: {filename} ({len(doc)} sivua)")
 
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=200
-    )
+    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     chunks = splitter.split_documents(documents)
     print(f"\nYhteensä {len(chunks)} chunkkia indeksoitavana")
     return chunks
 
 def build_index(chunks):
     embeddings = get_embeddings()
-
     batch_size = 50
-    print("\nBuilding index {len(chunks)} chunk in batches of {batch_size}...")
+    print(f"\nIndeksoidaan {len(chunks)} chunkkia erissä ({batch_size} kerrallaan)...")
+
     db = None
     for i in range(0, len(chunks), batch_size):
-        batch = chunks[i:i+batch_size]
-        print(f"  Processing batch {i//batch_size + 1} ({len(batch)} chunkkia)...")
+        batch = chunks[i:i + batch_size]
+        print(f"  Erä {i//batch_size + 1}/{-(-len(chunks)//batch_size)}: chunkit {i+1}–{min(i+batch_size, len(chunks))}")
         if db is None:
-            db = Chroma.from_documents(
+            db = AzureSearch.from_documents(
                 documents=batch,
                 embedding=embeddings,
-                persist_directory="chroma_db"
+                azure_search_endpoint=os.getenv("AZURE_SEARCH_ENDPOINT"),
+                azure_search_key=os.getenv("AZURE_SEARCH_API_KEY"),
+                index_name=os.getenv("AZURE_SEARCH_INDEX_NAME")
             )
         else:
             db.add_documents(batch)
-        time.sleep(3)  # Vältä nopeaa peräkkäistä API-kutsua
+        time.sleep(2)
 
-    print("Index built successfully. Pesisted to chroma_db directory.")
-    return db
-    
+    print("Indeksi valmis.")
+
 if __name__ == "__main__":
     print("Starting document indexing...")
     local_dir = download_blobs()

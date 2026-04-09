@@ -1,0 +1,13 @@
+using '../main.bicep'
+
+param environment = 'test'
+param project = 'energybot'
+param openAiAccountName = 'aoai-energybot-test'
+param storageAccountName = 'stragenergybottest'
+param funcStorageAccountName = 'stfuncenergybottest'
+param containerName = 'documents'
+param gptDeploymentName = 'gpt-4o'
+param embeddingDeploymentName = 'text-embedding-3-small'
+param functionAppName = 'func-energybot-test'
+param appServicePlanName = 'asp-energybot-test'
+param fileShareName = 'chroma-index'

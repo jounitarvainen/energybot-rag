@@ -1,13 +1,11 @@
+azure-functions
+azure-storage-blob
+azure-search-documents==11.6.0
 langchain==1.2.13
 langchain-openai==1.1.12
 langchain-classic==1.0.3
-langchain-community==0.4.1
 langchain-core==1.2.23
 langchain-text-splitters==1.1.1
 openai==2.30.0
-streamlit==1.55.0
 pymupdf==1.27.2.2
 python-dotenv==1.2.2
-azure-storage-blob==12.28.0b1
-azure-search-documents==11.6.0
-azure-identity==1.25.3

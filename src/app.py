@@ -1,8 +1,9 @@
+
 import streamlit as st
 from dotenv import load_dotenv
-from rag.chain import get_chain
-
 load_dotenv()
+
+from rag.chain import get_chain
 
 @st.cache_resource
 def load_qa_chain():
