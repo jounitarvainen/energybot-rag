@@ -2,15 +2,11 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Asennetaan riippuvuudet
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Kopioidaan koodi
 COPY src/ ./src/
-COPY chroma_db/ ./chroma_db/
 
-# Streamlit-konfiguraatio
 ENV PYTHONPATH=/app
 
 EXPOSE 8501
