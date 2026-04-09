@@ -134,8 +134,21 @@ Sovellus käyttää seuraavia julkisia suomalaisia energiadokumentteja:
 
 ## Jatkokehitys
 
-- [ ] Azure AI Search — hybrid search (semantic + keyword)
-- [ ] Azure Container Apps — pilviympäristöön deployment
-- [ ] Dokumenttien automaattinen päivitys Blob Storage triggerillä
-- [ ] VNet-integraatio Container Appsiin — staattinen uloslähtevä IP, 
-      mahdollistaa IP-whitelistauksen Azure OpenAI:lle ja Storage Accountille
+### VNet-integraatio (ei käytössä kehitysympäristössä)
+
+Tuotantoympäristössä kaikki resurssit tulisi sijoittaa VNetiin ja 
+Azure OpenAI sekä Storage Account tulisi suojata Private Endpointeilla.
+
+**Arkkitehtuuri:**
+VNet (10.0.0.0/16)
+├── subnet-apps (10.0.1.0/24)        → Container Apps
+├── subnet-functions (10.0.2.0/24)   → Azure Functions
+└── subnet-private-endpoints (10.0.3.0/24)
+├── Private Endpoint → Azure OpenAI
+└── Private Endpoint → Storage Account
+
+**Miksi ei kehitysympäristössä:**
+- Container Apps VNet-integraatio vaatii Dedicated Plan Management -lisämaksun
+- 200 USD kehityskreditit on tarkoituksenmukaisempaa käyttää toiminnallisuuden 
+  demonstrointiin
+- Bicep-moduuli (`infra/modules/vnet.bicep`) kuvaa tuotantoratkaisun arkkitehtuurin
