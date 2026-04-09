@@ -1,0 +1,49 @@
+name: Deploy Streamlit App
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/app.py'
+      - 'src/rag/**'
+      - 'requirements.txt'
+      - 'Dockerfile'
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/jounitarvainen/energybot-rag:latest
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to Container Apps
+        run: |
+          az containerapp update \
+            --name ca-energybot-dev \
+            --resource-group rg-rag-energybot-dev \
+            --image ghcr.io/jounitarvainen/energybot-rag:latest
