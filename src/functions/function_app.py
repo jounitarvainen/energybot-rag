@@ -22,6 +22,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_classic.schema import Document
 from langchain_openai import AzureOpenAIEmbeddings
 from langchain_classic.vectorstores import AzureSearch
+from azure.data.tables import TableServiceClient, TableEntity
 
 app = func.FunctionApp()
 
@@ -32,6 +33,25 @@ def get_embeddings():
         azure_deployment=os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT"),
         api_version=os.getenv("AZURE_OPENAI_EMBEDDING_API_VERSION")
     )
+
+def get_stored_etag(filename):
+    connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+    table_client = TableServiceClient.from_connection_string(connection_string).get_table_client("etagcache")
+    try:
+        entity = table_client.get_entity(partition_key="energybot", row_key=filename)
+        return entity["etag"]
+    except Exception:
+        return None
+
+def store_etag(filename, etag):
+    connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+    table_client = TableServiceClient.from_connection_string(connection_string).get_table_client("etagcache")
+    entity = {
+        "PartitionKey": "energybot",
+        "RowKey": filename,
+        "etag": etag
+    }
+    table_client.upsert_entity(entity=entity)
 
 def extract_chunks(blob_data, filename):
     doc = fitz.open(stream=blob_data, filetype="pdf")
@@ -52,21 +72,6 @@ def update_index(chunks, filename):
     key = os.getenv("AZURE_SEARCH_API_KEY")
     index_name = os.getenv("AZURE_SEARCH_INDEX_NAME")
 
-    # Poistetaan vanhat chunkit
-    from azure.search.documents import SearchClient
-    from azure.core.credentials import AzureKeyCredential
-    search_client = SearchClient(endpoint=endpoint, index_name=index_name, credential=AzureKeyCredential(key))
-    existing = search_client.search(
-        search_text="*",
-        filter=f"source eq '{filename}'",
-        top=1000,
-        select=["id"]
-    )
-    ids_to_delete = [result["id"] for result in existing]
-    if ids_to_delete:
-        search_client.delete_documents(documents=[{"id": id} for id in ids_to_delete])
-        logging.info(f"Poistettu {len(ids_to_delete)} vanhaa dokumenttia: {filename}")
-
     # Lisätään uudet chunkit
     batch_size = 50
     db = None
@@ -86,7 +91,7 @@ def update_index(chunks, filename):
         time.sleep(2)
 
     logging.info(f"Lisätty {len(chunks)} uutta chunkia: {filename}")
-
+    
 @app.blob_trigger(
     arg_name="myblob",
     path="documents/hot-folder/{name}",
@@ -99,7 +104,20 @@ def blob_trigger(myblob: func.InputStream):
     if not blob_name.endswith(".pdf"):
         logging.info(f"Ohitetaan ei-PDF tiedosto: {blob_name}")
         return
-    
+
+    # ETag-tarkistus
+    connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+    blob_service = BlobServiceClient.from_connection_string(connection_string)
+    blob_client = blob_service.get_blob_client(container="documents", blob=f"hot-folder/{blob_name}")
+    current_etag = blob_client.get_blob_properties().etag
+    stored_etag = get_stored_etag(blob_name)
+
+    if current_etag == stored_etag:
+        logging.info(f"Tiedosto ei muuttunut, ohitetaan: {blob_name}")
+        return
+
+    logging.info(f"Uusi tai muuttunut tiedosto, indeksoidaan: {blob_name}")
+
     # Indeksoidaan
     blob_data = myblob.read()
     chunks = extract_chunks(blob_data, blob_name)
@@ -107,17 +125,19 @@ def blob_trigger(myblob: func.InputStream):
     update_index(chunks, blob_name)
     logging.info(f"Indeksi päivitetty: {blob_name}")
 
+    # Tallennetaan uusi ETag
+    store_etag(blob_name, current_etag)
+    logging.info(f"ETag tallennettu: {blob_name}")
+
     # Siirretään processed-kansioon ja poistetaan hot-folderista
     connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
     client = BlobServiceClient.from_connection_string(connection_string)
     container_client = client.get_container_client("documents")
 
-    # Kopioidaan processed-kansioon
     source_blob = container_client.get_blob_client(f"hot-folder/{blob_name}")
     target_blob = container_client.get_blob_client(f"processed/{blob_name}")
     target_blob.start_copy_from_url(source_blob.url)
     logging.info(f"Kopioitu processed-kansioon: {blob_name}")
 
-    # Poistetaan hot-folderista
     source_blob.delete_blob()
     logging.info(f"Poistettu hot-folderista: {blob_name}")
